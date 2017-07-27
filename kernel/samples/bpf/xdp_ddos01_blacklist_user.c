@@ -19,6 +19,7 @@ static const char *__doc__=
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
