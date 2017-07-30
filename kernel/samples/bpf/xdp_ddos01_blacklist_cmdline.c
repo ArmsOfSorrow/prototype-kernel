@@ -274,6 +274,10 @@ int main(int argc, char **argv)
 	char _ip_string_buf[STR_MAX] = {};
 	char *ip_string = NULL;
 
+	/* port range support */
+	char range_string_buf[12] = {0};
+	char *range_string = NULL;
+
 	unsigned int action = 0;
 	bool stats = false;
 	int interval = 1;
@@ -308,6 +312,13 @@ int main(int argc, char **argv)
 		case 'u':
 			proto = IPPROTO_UDP;
 			filter = DDOS_FILTER_UDP;
+		case 'r':
+			if (optarg)
+			{
+				/* split range string and write port range
+				 * into map*/
+
+			}
 		case 't':
 			if (optarg)
 				dport = atoi(optarg);

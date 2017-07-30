@@ -43,6 +43,9 @@ struct bpf_map_def SEC("maps") verdict_cnt = {
 	.max_entries = XDP_ACTION_MAX,
 };
 
+/* ok, so we basically already have drop support based on
+ * ports. what's still needed is the ability to write port ranges
+ * into the map from user space. */
 struct bpf_map_def SEC("maps") port_blacklist = {
 	.type        = BPF_MAP_TYPE_PERCPU_ARRAY,
 	.key_size    = sizeof(u32),
@@ -123,10 +126,12 @@ bool parse_eth(struct ethhdr *eth, void *data_end,
 	u16 eth_type;
 	u64 offset;
 
+	/* get size of eth frame, check if it goes beyond data end */
 	offset = sizeof(*eth);
 	if ((void *)eth + offset > data_end)
 		return false;
 
+	/* get type of eth frame */
 	eth_type = eth->h_proto;
 	bpf_debug("Debug: eth_type:0x%x\n", ntohs(eth_type));
 
@@ -187,6 +192,8 @@ u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
 		return XDP_PASS;
 	}
 
+	/* as it seems, we only need to modify this to deal with port ranges 
+	 * and get rid of the code that deals with IPs */
 	dport_idx = dport;
 	value = bpf_map_lookup_elem(&port_blacklist, &dport_idx);
 
@@ -224,6 +231,7 @@ u32 parse_ipv4(struct xdp_md *ctx, u64 l3_offset)
 
 	bpf_debug("Valid IPv4 packet: raw saddr:0x%x\n", ip_src);
 
+	/* TODO: instead of looking up IP in the map, look up port */
 	value = bpf_map_lookup_elem(&blacklist, &ip_src);
 	if (value) {
 		/* Don't need __sync_fetch_and_add(); as percpu map */
