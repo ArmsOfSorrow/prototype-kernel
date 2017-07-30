@@ -38,6 +38,7 @@ static const struct option long_options[] = {
 	{"list",	no_argument,		NULL, 'l' },
 	{"udp-dport",	required_argument,	NULL, 'u' },
 	{"tcp-dport",	required_argument,	NULL, 't' },
+	{"range",	required_argument,	NULL, 'r'},
 	{0, 0, NULL,  0 }
 };
 
@@ -317,7 +318,8 @@ int main(int argc, char **argv)
 			{
 				/* split range string and write port range
 				 * into map*/
-
+				range_string = (char *)&range_string_buf;
+				strncpy(range_string, optarg, 12);
 			}
 		case 't':
 			if (optarg)
@@ -356,12 +358,16 @@ int main(int argc, char **argv)
 			close(fd_blacklist);
 		}
 
-		if (dport) {
+		if (dport && !range_string) {
 			fd_port_blacklist = open_bpf_map(file_port_blacklist);
 			fd_port_blacklist_count = open_bpf_map(file_port_blacklist_count[filter]);
 			res = blacklist_port_modify(fd_port_blacklist, fd_port_blacklist_count, dport, action, proto);
 			close(fd_port_blacklist);
 			close(fd_port_blacklist_count);
+		}
+
+		if (dport && range_string) {
+			printf("dest port and range string specified");
 		}
 		return res;
 	}
