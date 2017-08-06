@@ -368,8 +368,8 @@ int main(int argc, char **argv)
 
 	/* Add something to the map as a test */
 	/* TODO: remove this */
-	blacklist_modify(map_fd[0], "198.18.50.3", ACTION_ADD);
-	blacklist_port_modify(map_fd[2], map_fd[4], 80, ACTION_ADD, IPPROTO_UDP);
+	/*blacklist_modify(map_fd[0], "198.18.50.3", ACTION_ADD);
+	blacklist_port_modify(map_fd[2], map_fd[4], 80, ACTION_ADD, IPPROTO_UDP);*/
 
 	return EXIT_OK;
 }
