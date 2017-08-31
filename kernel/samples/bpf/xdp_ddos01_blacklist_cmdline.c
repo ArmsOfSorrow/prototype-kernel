@@ -310,17 +310,18 @@ int main(int argc, char **argv)
 			ip_string = (char *)&_ip_string_buf;
 			strncpy(ip_string, optarg, STR_MAX);
 			break;
-		case 'u':
-			proto = IPPROTO_UDP;
-			filter = DDOS_FILTER_UDP;
 		case 'r':
 			if (optarg)
 			{
-				/* split range string and write port range
-				 * into map*/
 				range_string = (char *)&range_string_buf;
 				strncpy(range_string, optarg, 12);
+				/* ugly hack, but we want UDP to be standard */
+				proto = IPPROTO_UDP;
 			}
+			break;
+		case 'u':
+			proto = IPPROTO_UDP;
+			filter = DDOS_FILTER_UDP;
 		case 't':
 			if (optarg)
 				dport = atoi(optarg);
@@ -346,6 +347,42 @@ int main(int argc, char **argv)
 	if (action) {
 		int res = 0;
 
+		if (range_string) {
+			printf("range string specified: %s", range_string);
+			/* TODO: return res from here, otherwise it'll go to fail_opt */
+
+			fd_port_blacklist = open_bpf_map(file_port_blacklist);
+			fd_port_blacklist_count = open_bpf_map(file_port_blacklist_count[filter]);
+
+			char *tok = strsep(&range_string, "-");
+			printf("token: %s", tok);
+
+			char *tok2 = strsep(&range_string, "-");
+			printf("token 2: %s", tok2);
+
+			if (tok && tok2)
+			{
+				int start = atoi(tok);
+				int end = atoi(tok2);
+
+				if (start > end)
+				{
+					printf("Invalid range, start > end");
+					return 0;
+				}
+
+				for (int i = start; i <= end; ++i)
+				{
+					res = blacklist_port_modify(fd_port_blacklist, fd_port_blacklist_count, i, action, proto);
+					/* TODO: error handling? */
+				}
+			}
+
+			close(fd_port_blacklist);
+			close(fd_port_blacklist_count);
+			return res;
+		}
+
 		if (!ip_string && !dport) {
 			fprintf(stderr,
 			  "ERR: action require type+data, e.g option --ip\n");
@@ -365,10 +402,7 @@ int main(int argc, char **argv)
 			close(fd_port_blacklist);
 			close(fd_port_blacklist_count);
 		}
-
-		if (dport && range_string) {
-			printf("dest port and range string specified");
-		}
+		
 		return res;
 	}
 
