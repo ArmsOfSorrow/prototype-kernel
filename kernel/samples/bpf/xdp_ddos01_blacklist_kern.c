@@ -92,11 +92,11 @@ static inline struct bpf_map_def *drop_count_by_fproto(int fproto) {
  * end-up in /sys/kernel/debug/tracing/trace_pipe
  */
 #define bpf_debug(fmt, ...)						\
-		({							\
-			char ____fmt[] = fmt;				\
-			bpf_trace_printk(____fmt, sizeof(____fmt),	\
-				     ##__VA_ARGS__);			\
-		})
+	({							\
+	 char ____fmt[] = fmt;				\
+	 bpf_trace_printk(____fmt, sizeof(____fmt),	\
+##__VA_ARGS__);			\
+	 })
 #else
 #define bpf_debug(fmt, ...) { } while (0)
 #endif
@@ -121,7 +121,7 @@ void stats_action_verdict(u32 action)
  */
 static __always_inline
 bool parse_eth(struct ethhdr *eth, void *data_end,
-	       u16 *eth_proto, u64 *l3_offset)
+		u16 *eth_proto, u64 *l3_offset)
 {
 	u16 eth_type;
 	u64 offset;
@@ -172,7 +172,7 @@ u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
 		udph = hdr;
 		if (udph + 1 > data_end) {
 			bpf_debug("Invalid UDPv4 packet: L4off:%llu\n",
-				  sizeof(struct iphdr) + sizeof(struct udphdr));
+					sizeof(struct iphdr) + sizeof(struct udphdr));
 			return XDP_ABORTED;
 		}
 		dport = ntohs(udph->dest);
@@ -182,14 +182,14 @@ u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
 		tcph = hdr;
 		if (tcph + 1 > data_end) {
 			bpf_debug("Invalid TCPv4 packet: L4off:%llu\n",
-				  sizeof(struct iphdr) + sizeof(struct tcphdr));
+					sizeof(struct iphdr) + sizeof(struct tcphdr));
 			return XDP_ABORTED;
 		}
 		dport = ntohs(tcph->dest);
 		fproto = DDOS_FILTER_TCP;
 		break;
 	default:
-		return XDP_PASS;
+		return XDP_TX;
 	}
 
 	/* as it seems, we only need to modify this to deal with port ranges 
@@ -208,7 +208,7 @@ u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
 			return XDP_DROP;
 		}
 	}
-	return XDP_PASS;
+	return XDP_TX;
 }
 
 static __always_inline
@@ -254,9 +254,22 @@ u32 handle_eth_protocol(struct xdp_md *ctx, u16 eth_proto, u64 l3_offset)
 		/* Fall-through */
 	default:
 		bpf_debug("Not handling eth_proto:0x%x\n", eth_proto);
-		return XDP_PASS;
+		/* we should rewrite the mac and bounce back to sender by
+		 * default */
+		return XDP_TX;
 	}
-	return XDP_PASS;
+	return XDP_TX;
+}
+
+static inline void switch_src_dst_mac(struct ethhdr *hdr)
+{
+	uint8_t t;
+	for (int i = 0; i < ETH_ALEN; ++i)
+	{
+		t = hdr->h_dest[i];
+		hdr->h_dest[i] = hdr->h_source[i];
+		hdr->h_source[i] = t;
+	}
 }
 
 SEC("xdp_prog")
@@ -271,12 +284,13 @@ int  xdp_program(struct xdp_md *ctx)
 
 	if (!(parse_eth(eth, data_end, &eth_proto, &l3_offset))) {
 		bpf_debug("Cannot parse L2: L3off:%llu proto:0x%x\n",
-			  l3_offset, eth_proto);
+				l3_offset, eth_proto);
 		return XDP_PASS; /* Skip */
 	}
 	bpf_debug("Reached L3: L3off:%llu proto:0x%x\n", l3_offset, eth_proto);
 
 	action = handle_eth_protocol(ctx, eth_proto, l3_offset);
+	if (action == XDP_TX) switch_src_dst_mac(eth);
 	stats_action_verdict(action);
 	return action;
 }
